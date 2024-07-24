@@ -560,7 +560,7 @@ spec:
           value: /vault/secrets/
         - name: SERVICE_CONF
           value: /config_files/config.json
-        image: docker.io/library/nginx:latest
+        image: nginxinc/nginx-unprivileged
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
