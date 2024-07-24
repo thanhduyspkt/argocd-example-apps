@@ -1,4 +1,4 @@
-=---
+---
 # Source: account-service/templates/go-app.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -774,8 +774,6 @@ spec:
   suspend: false
 ---
 # Source: account-service/templates/go-jobs.yaml
-# The jobs are temporary solution to mass apply/remove BANK_RESTRICTED hold code that need be released in 2024-08-01
-# The jobs will be removed eventually, please don't create any new jobs in this templateapiVersion: batch/v1
 apiVersion: batch/v1
 kind: CronJob
 metadata:
