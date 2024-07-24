@@ -1,0 +1,1097 @@
+---
+# Source: deposits-core/templates/go-app.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::404825353787:role/eks/cluster/dev-backend-01/deposits-core20240621033635709200000002
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: release-name-deposits-core
+---
+# Source: deposits-core/templates/go-app.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: release-name-deposits-core-restarter
+---
+# Source: deposits-core/templates/configmap.yaml
+apiVersion: v1
+data:
+  config.json: |-
+    {
+      "name": "deposits-core Service",
+      "serviceName": "deposits-core",
+      "host": "0.0.0.0",
+      "port": 8080,
+      "env": "dev",
+      "ownerInfo": {
+        "name": "digibank",
+        "email": "digibank.tech@myteksi.com",
+        "url": "digibank.myteksi.com"
+      },
+      "data": {
+        "mysql": {
+          "master": {
+            "dsn": "{{dc_username}}:{{dc_password}}@tcp($MYSQL_HOST$:3306)/$DB_NAME$?parseTime=true&loc=UTC",
+            "maxIdle": 25,
+            "maxOpen": 50,
+            "connMaxLifetime": "1800s"
+          },
+          "slave": {
+            "dsn": "{{dc_username}}:{{dc_password}}@tcp($MYSQL_HOST_REPLICA$:3306)/$DB_NAME$?parseTime=true&loc=UTC",
+            "maxIdle": 25,
+            "maxOpen": 50,
+            "connMaxLifetime": "1800s"
+          },
+          "masterCircuitBreaker": {
+            "timeoutInMs": 1000
+          },
+          "slaveCircuitBreaker": {
+            "timeoutInMs": 1000
+          }
+        }
+      },
+      "statsd": {
+        "host": "$DOGSTATSD_HOST$",
+        "port": 8125
+      },
+      "trace": {
+        "host": "$DOGSTATSD_HOST$",
+        "port": 8126
+      },
+      "logger": {
+        "workerCount": 10,
+        "bufferSize": 10000,
+        "logLevel": 1,
+        "stacktraceLevel": 4,
+        "logFormat": "json",
+        "development": true
+      },
+      "depositsCoreConfig": {
+        "clientConfig": {
+          "maxIdleConnsPerHost": 64,
+          "idleConnTimeoutInSMillis": 10000,
+          "timeoutInMillis": 4000,
+          "requestLogLockTimeoutInMillis": 5000
+        },
+        "dormancySchedulerLockDurationInHours": 12,
+        "dormancySchedulerCronExpression": "0 0 * * *",
+        "dormancyThresholdInDays": 365,
+        "interestUpdateScheduleCronExpression": "*/15 * * * *",
+        "interestUpdateSchedulerLockDurationInMinutes": 720,
+        "productVariantCodeConfig": {
+          "depositAccount": "DEPOSITS_ACCOUNT",
+          "operatingAccount": "BIZ_DEPOSIT_ACCOUNT",
+          "savingsPocket": "SAVINGS_POCKET"
+        },
+        "savingsPocketConfig": {
+          "maxAllowedLength": 4,
+          "productVariant": "SAVINGS_POCKET"
+        },
+        "childAccountConfig": {
+          "maxAllowedLength": 3
+        },
+        "tmAccountListMaxPage": 10,
+        "schedulerConfig": {
+          "thoughtMachineFailedJob": {
+            "lockDurationInMinutes": 5
+          }
+        },
+        "thoughtMachineFailedJobConfig": {
+          "maxRepublishCount": 5,
+          "maxRepublishFailureCount": 5,
+          "ignoreJobIDs": []
+        },
+        "allowedDepositsTMSchedulers": {
+          "LABYRINTH_SUPERVISOR_DEPOSIT_DAILY_SCHEDULE_AST": true
+        },
+        "kafkaPostingPhaseRolloutPercentage": 80,
+        "allowedTxnCodeDomain": {
+          "DEPOSITS" : true,
+          "FINANCE" : true,
+          "DEBIT_CARD" : true,
+          "TREASURY" : true,
+          "INSURANCE": true,
+          "BIZ_DEPOSITS": true
+        }
+      },
+      "thoughtMachineConfig": {
+        "thoughtMachineURL": "https://core-api.tm.dev.g-bank.app",
+        "thoughtMachineToken": "{{tm_token}}",
+        "postingClientResponseTopic": "integration.sdkclient.deposits_core",
+        "postingClientLowPriorityResponseTopic": "integration.sdkclient.deposits_core.low_priority",
+        "balanceEventResponseTopic": "vault.core_api.v1.balances.balance.events",
+        "postingBatchEventResponseTopic": "vault.api.v1.postings.posting_instruction_batch.created",
+        "accountUpdateEventResponseTopic":"vault.core_api.v1.accounts.account_update.events",
+        "planUpdateEventResponseTopic":"vault.core_api.v1.plans.plan_update.events",
+        "planAssociateEventResponseTopic": "vault.core_api.v1.plans.account_plan_assoc.events",
+        "accountCreatedEventResponseTopic": "vault.core_api.v1.accounts.account.events",
+        "planCreatedEventResponseTopic": "vault.core_api.v1.plans.plan.events",
+        "thoughtMachineKafkaURL": [
+          "b-1.dbmydevtmmskclust.wlcoxl.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.dbmydevtmmskclust.wlcoxl.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.dbmydevtmmskclust.wlcoxl.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "kafkaConsumerGroupID": "tm-deposits-core-dev",
+        "requestTimeoutMillis": 100000,
+        "initialIntervalMillis": 10,
+        "maxIntervalMillis" : 100000,
+        "attemptCount" : 5,
+        "supervisorContractVersionID": "3d21335f-ac43-4e91-b651-60c77ad0ffb6",
+        "opsPortalURL": "https://ops.tm.dev.g-bank.app",
+        "bizSupervisorContractVersionID": "33ea181b-0d8c-4da4-ace7-d9344eb340f9"
+      },
+      "accountServiceConfig": {
+        "baseURL": "http://account-service.core-banking.svc.cluster.local"
+      },
+      "transactionLimitConfig": {
+        "baseURL": "http://transaction-limit.payments.svc.cluster.local"
+      },
+      "productMasterConfig": {
+        "baseURL": "http://product-master.core-banking.svc.cluster.local"
+      },
+      "depositsExpConfig": {
+        "baseURL": "http://deposits-exp.core-banking.svc.cluster.local"
+      },
+      "accountStatusEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-status-update-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-core-account-status-update-event",
+        "packageName": "pb",
+        "dtoName": "DepositsAccountStatusUpdateEvent",
+        "offsetType": "oldest",
+        "enable": true
+      },
+      "accountCreationEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-account-creation-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-account-creation-event",
+        "packageName": "pb",
+        "dtoName": "DepositsAccountCreateEvent",
+        "offsetType": "oldest",
+        "enable": true
+      },
+      "postingInstructionKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-core-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-core-tx",
+        "packageName": "pb",
+        "dtoName": "DepositsCoreTx",
+        "offsetType": "oldest"
+      },
+      "lowPriorityPostingInstructionKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-core-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-core-low-priority-tx",
+        "packageName": "pb",
+        "dtoName": "DepositsCoreTx",
+        "offsetType": "oldest"
+      },
+      "accountUpdateKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-update-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-account-update-event",
+        "packageName": "pb",
+        "dtoName": "AccountStatusUpdateEvent",
+        "offsetType": "oldest",
+        "enable": true
+      },
+      "balanceEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-balance-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-balance-event",
+        "packageName": "pb",
+        "dtoName": "DepositsBalanceEvent",
+        "offsetType": "oldest"
+      },
+      "postingInstructionBatchCreatedEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-posting-batch-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-posting-batch-event",
+        "packageName": "pb",
+        "dtoName": "DepositsCoreTx",
+        "offsetType": "oldest"
+      },
+      "dormantAccountEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "dormant-account-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-dormant-account-event",
+        "packageName": "pb",
+        "dtoName": "DepositsDormantAccount",
+        "offsetType": "oldest"
+      },
+      "featureFlags": {
+        "enableTransactionLimit": false,
+        "enableAsyncAccountClosure": true,
+        "enablePriorityPosting": true,
+        "enableAsyncPosting": true,
+        "enableAccountCreationV2": true,
+        "enableRetryableStream": true,
+        "enableSQSBackgroundJob": true,
+        "enableAcctDormantJob": true
+      },
+      "workflowConfig": {
+        "enabled" : true,
+        "closeCASAAccount": {
+          "transactional": {
+            "intervalInSeconds": 30,
+            "maxAttempt": 5
+          },
+          "auxiliary": {
+            "intervalInSeconds": 10,
+            "maxAttempt": 2
+          }
+        },
+        "createOperatingAccountWorkflow": {
+          "transactional": {
+            "intervalInSeconds": 30,
+            "maxAttempt": 5
+          },
+          "auxiliary": {
+            "intervalInSeconds": 10,
+            "maxAttempt": 2
+          }
+        }
+      },
+      "redisConfig": {
+        "addr": "clustercfg.dbmy-dev-backend-ec-deposits-core.o9f56r.apse1.cache.amazonaws.com:6379",
+        "idleTimeoutInSec": 1,
+        "poolSize": 300,
+        "readOnlyFromSlaves": false,
+        "readTimeoutInSec": 1,
+        "writeTimeoutInSec": 1,
+        "password": "{{REDIS_PASSWORD}}",
+        "tlsEnabled": true
+      },
+      "locale": {
+        "currency": "MYR"
+      },
+      "tenant": "MY",
+      "accountNumberFormat": {
+        "CASA": "-B-L-A-N-C-"
+      },
+      "retry": {
+        "accountClosureMaxRetries": 3,
+        "accountClosureRetryWaitTimeInMs": 300,
+        "pocketClosureMaxRetries":3,
+        "pocketClosureRetryWaitTimeInMs": 300,
+        "enquireTransferBatchMaxRetries": 5,
+        "enquireTransferBatchRetryWaitTimeInMs": 100
+      },
+      "maxChildCount": 999,
+      "slackConfig": {
+        "token": "{{slack_bot_token}}",
+        "defaultChannelID": "C06S0JRQXQE",
+        "enabled": true
+      },
+      "sqsConfig": {
+        "queueURL": "https://sqs.ap-southeast-1.amazonaws.com/404825353787/dev-backend-deposits-core-sqs20240621033635710000000003",
+        "awsRegion": "ap-southeast-1",
+        "exponentialBackoffBaseIntervalSeconds": 1
+      },
+      "backgroundJobSQSConfig": {
+        "queueURL": "https://sqs.ap-southeast-1.amazonaws.com/404825353787/dev-backend-deposits-core-sqs-background-job-queue20240628033407992900000004",
+        "awsRegion": "ap-southeast-1",
+        "exponentialBackoffBaseIntervalSeconds": 2,
+        "waitTimeSeconds": 20,
+        "defaultVisibilityTimeoutSeconds": 30,
+        "workerCount": 3,
+        "maxNumberOfMessages": 10,
+        "environment": ""
+      },
+      "acctDormantJobConfig": {
+        "batchSize": 50,
+        "batchStartFrom": 0,
+        "runID": "",
+        "dormancyThresholdInDays": 730
+      }
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: deposits-core-release-name
+---
+# Source: deposits-core/templates/go-app.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core-restarter
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: release-name-deposits-core-restarter
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - patch
+---
+# Source: deposits-core/templates/go-app.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core-restarter
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: release-name-deposits-core-restarter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-name-deposits-core-restarter
+subjects:
+- kind: ServiceAccount
+  name: release-name-deposits-core-restarter
+---
+# Source: deposits-core/templates/go-app.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: release-name-deposits-core
+spec:
+  ports:
+  - appProtocol: http
+    name: http-deposits-core
+    nodePort: null
+    port: 80
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/name: deposits-core
+  type: ClusterIP
+---
+# Source: deposits-core/templates/go-app.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: release-name-deposits-core
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: release-name
+      app.kubernetes.io/name: deposits-core
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        apm.datadoghq.com/env: '{ "DD_SERVICE": "release-name-deposits-core" }'
+        checksum/config: ae041c3d08b9277dc6e218fdf37b3557939fe686dbcb61a99b516e2deeaabdc5
+        vault.hashicorp.com/agent-cache-enable: "true"
+        vault.hashicorp.com/agent-init-first: "true"
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-inject-secret-deposits_core_db_creds.json: database/creds/dev-backend-depositscore-rds-mysql-dba
+        vault.hashicorp.com/agent-inject-secret-deposits_core_static_creds.json: kv2/data/core-experience/app/deposits-core/token
+        vault.hashicorp.com/agent-inject-secret-redis_creds.json: kv/data/security/tf/dev/deposits-core/ec/auth
+        vault.hashicorp.com/agent-inject-secret-slack_creds.json: kv2/data/core-experience/app/shared/slack
+        vault.hashicorp.com/agent-inject-template-deposits_core_db_creds.json: |
+          {{ with secret "database/creds/dev-backend-depositscore-rds-mysql-dba" -}}
+            {
+              "dc_username": "{{ .Data.username }}",
+              "dc_password": "{{ .Data.password }}"
+            }
+          {{- end }}
+        vault.hashicorp.com/agent-inject-template-deposits_core_static_creds.json: |
+          {{ with secret "kv2/data/core-experience/app/deposits-core/token" -}}
+            {
+              "tm_token": "{{ .Data.data.tm_token }}"
+            }
+          {{- end }}
+        vault.hashicorp.com/agent-inject-template-redis_creds.json: |
+          {{ with secret "kv/data/security/tf/dev/deposits-core/ec/auth" -}}
+            {
+              "REDIS_PASSWORD": "{{ .Data.auth_token }}"
+            }
+          {{- end }}
+        vault.hashicorp.com/agent-inject-template-slack_creds.json: |
+          {{ with secret "kv2/data/core-experience/app/shared/slack" -}}
+            {
+              "slack_bot_token": "{{ .Data.data.bot_token }}"
+            }
+          {{- end }}
+        vault.hashicorp.com/role: deposits-core
+      labels:
+        app.kubernetes.io/instance: release-name
+        app.kubernetes.io/name: deposits-core
+        tags.datadoghq.com/env: dev
+        tags.datadoghq.com/service: deposits-core
+        tags.datadoghq.com/version: dev-9eceab4-10380866
+    spec:
+      containers:
+      - env:
+        - name: DOGSTATSD_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: DD_ENTITY_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        - name: DD_ENV
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['tags.datadoghq.com/env']
+        - name: DD_SERVICE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['tags.datadoghq.com/service']
+        - name: DD_VERSION
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['tags.datadoghq.com/version']
+        - name: DB_NAME
+          value: deposits_core_dev
+        - name: DEBUG_KAFKA
+          value: "true"
+        - name: MYSQL_HOST
+          value: dev-backend-depositscore-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+        - name: MYSQL_HOST_REPLICA
+          value: dev-backend-depositscore-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+        - name: SECRET_CONF
+          value: /vault/secrets/
+        - name: SERVICE_CONF
+          value: /config_files/config.json
+        image: gcr.io/heptio-images/ks-guestbook-demo:0.2
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /health_check
+            port: 8080
+        name: deposits-core
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /health_check
+            port: 8080
+        resources:
+          limits:
+            memory: 128Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext: {}
+        volumeMounts:
+        - mountPath: /config_files
+          name: config-volume
+      initContainers: null
+      nodeSelector: null
+      securityContext:
+        fsGroup: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+      serviceAccountName: release-name-deposits-core
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: deposits-core
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - configMap:
+          name: deposits-core-release-name
+        name: config-volume
+---
+# Source: deposits-core/templates/go-app.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core-restarter
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: release-name-deposits-core-restarter
+spec:
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: release-name
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: deposits-core-restarter
+        app.kubernetes.io/version: f30ee9e
+        helm.sh/chart: deposits-core-0.1.0
+        tags.datadoghq.com/env: dev
+        tags.datadoghq.com/service: deposits-core
+        tags.datadoghq.com/version: dev-9eceab4-10380866
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/instance: release-name
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: deposits-core-restarter
+            app.kubernetes.io/version: f30ee9e
+            helm.sh/chart: deposits-core-0.1.0
+            sidecar.istio.io/inject: "false"
+            tags.datadoghq.com/env: dev
+            tags.datadoghq.com/service: deposits-core
+            tags.datadoghq.com/version: dev-9eceab4-10380866
+        spec:
+          containers:
+          - command:
+            - /bin/sh
+            - -c
+            - |
+              kubectl rollout restart deploy release-name-deposits-core -n default
+            image: https://hub.docker.com/r/bitnami/kubectl:latest
+            name: restarter
+          restartPolicy: OnFailure
+          serviceAccountName: release-name-deposits-core-restarter
+  schedule: 0 23 * * 6
+---
+# Source: deposits-core/templates/go-job.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: release-name-deposits-core-tm-republish-failed-job
+spec:
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          annotations:
+            checksum/config: ae041c3d08b9277dc6e218fdf37b3557939fe686dbcb61a99b516e2deeaabdc5
+            vault.hashicorp.com/agent-cache-enable: "true"
+            vault.hashicorp.com/agent-init-first: "true"
+            vault.hashicorp.com/agent-inject: "true"
+            vault.hashicorp.com/agent-inject-secret-deposits_core_db_creds.json: database/creds/dev-backend-depositscore-rds-mysql-dba
+            vault.hashicorp.com/agent-inject-secret-deposits_core_static_creds.json: kv2/data/core-experience/app/deposits-core/token
+            vault.hashicorp.com/agent-inject-secret-redis_creds.json: kv/data/security/tf/dev/deposits-core/ec/auth
+            vault.hashicorp.com/agent-inject-secret-slack_creds.json: kv2/data/core-experience/app/shared/slack
+            vault.hashicorp.com/agent-inject-template-deposits_core_db_creds.json: |
+              {{ with secret "database/creds/dev-backend-depositscore-rds-mysql-dba" -}}
+                {
+                  "dc_username": "{{ .Data.username }}",
+                  "dc_password": "{{ .Data.password }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/agent-inject-template-deposits_core_static_creds.json: |
+              {{ with secret "kv2/data/core-experience/app/deposits-core/token" -}}
+                {
+                  "tm_token": "{{ .Data.data.tm_token }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/agent-inject-template-redis_creds.json: |
+              {{ with secret "kv/data/security/tf/dev/deposits-core/ec/auth" -}}
+                {
+                  "REDIS_PASSWORD": "{{ .Data.auth_token }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/agent-inject-template-slack_creds.json: |
+              {{ with secret "kv2/data/core-experience/app/shared/slack" -}}
+                {
+                  "slack_bot_token": "{{ .Data.data.bot_token }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/role: deposits-core
+          labels:
+            app.kubernetes.io/instance: release-name
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: deposits-core-cronjob
+            app.kubernetes.io/version: f30ee9e
+            helm.sh/chart: deposits-core-0.1.0
+            tags.datadoghq.com/alias: tm-republish-failed-job-worker
+            tags.datadoghq.com/env: dev
+            tags.datadoghq.com/service: deposits-core
+            tags.datadoghq.com/version: dev-9eceab4-10380866
+        spec:
+          containers:
+          - env:
+            - name: DOGSTATSD_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_ENTITY_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: DB_NAME
+              value: deposits_core_dev
+            - name: DEBUG_KAFKA
+              value: "true"
+            - name: MYSQL_HOST
+              value: dev-backend-depositscore-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+            - name: MYSQL_HOST_REPLICA
+              value: dev-backend-depositscore-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+            - name: SECRET_CONF
+              value: /vault/secrets/
+            - name: SERVICE_CONF
+              value: /config_files/config.json
+            - name: __ENABLE_TM_FAILED_JOB_WORKER
+              value: "true"
+            - name: WORKER_MODE
+              value: "true"
+            image: gcr.io/heptio-images/ks-guestbook-demo:0.2
+            imagePullPolicy: Always
+            name: deposits-core
+            resources:
+              limits:
+                memory: 256Mi
+              requests:
+                cpu: 350m
+                memory: 256Mi
+            securityContext: {}
+            volumeMounts:
+            - mountPath: /config_files
+              name: config-volume
+          restartPolicy: Never
+          securityContext:
+            fsGroup: 65532
+            runAsGroup: 65532
+            runAsNonRoot: true
+            runAsUser: 65532
+          serviceAccountName: release-name-deposits-core
+          volumes:
+          - configMap:
+              name: deposits-core-release-name
+            name: config-volume
+      ttlSecondsAfterFinished: 600
+  schedule: 0 * * * *
+---
+# Source: deposits-core/templates/go-job.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: release-name-deposits-core-update-acct-dormancy-job
+spec:
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          annotations:
+            checksum/config: ae041c3d08b9277dc6e218fdf37b3557939fe686dbcb61a99b516e2deeaabdc5
+            vault.hashicorp.com/agent-cache-enable: "true"
+            vault.hashicorp.com/agent-enable-quit: "true"
+            vault.hashicorp.com/agent-init-first: "true"
+            vault.hashicorp.com/agent-inject: "true"
+            vault.hashicorp.com/agent-inject-secret-deposits_core_db_creds.json: database/creds/dev-backend-depositscore-rds-mysql-dba
+            vault.hashicorp.com/agent-inject-secret-deposits_core_static_creds.json: kv2/data/core-experience/app/deposits-core/token
+            vault.hashicorp.com/agent-inject-secret-redis_creds.json: kv/data/security/tf/dev/deposits-core/ec/auth
+            vault.hashicorp.com/agent-inject-secret-slack_creds.json: kv2/data/core-experience/app/shared/slack
+            vault.hashicorp.com/agent-inject-template-deposits_core_db_creds.json: |
+              {{ with secret "database/creds/dev-backend-depositscore-rds-mysql-dba" -}}
+                {
+                  "dc_username": "{{ .Data.username }}",
+                  "dc_password": "{{ .Data.password }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/agent-inject-template-deposits_core_static_creds.json: |
+              {{ with secret "kv2/data/core-experience/app/deposits-core/token" -}}
+                {
+                  "tm_token": "{{ .Data.data.tm_token }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/agent-inject-template-redis_creds.json: |
+              {{ with secret "kv/data/security/tf/dev/deposits-core/ec/auth" -}}
+                {
+                  "REDIS_PASSWORD": "{{ .Data.auth_token }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/agent-inject-template-slack_creds.json: |
+              {{ with secret "kv2/data/core-experience/app/shared/slack" -}}
+                {
+                  "slack_bot_token": "{{ .Data.data.bot_token }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/role: deposits-core
+          labels:
+            app.kubernetes.io/instance: release-name
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: deposits-core-cronjob
+            app.kubernetes.io/version: f30ee9e
+            helm.sh/chart: deposits-core-0.1.0
+            tags.datadoghq.com/alias: update-acct-dormancy-job-worker
+            tags.datadoghq.com/env: dev
+            tags.datadoghq.com/service: deposits-core
+            tags.datadoghq.com/version: dev-9eceab4-10380866
+        spec:
+          containers:
+          - env:
+            - name: DOGSTATSD_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_ENTITY_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: DB_NAME
+              value: deposits_core_dev
+            - name: DEBUG_KAFKA
+              value: "true"
+            - name: MYSQL_HOST
+              value: dev-backend-depositscore-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+            - name: MYSQL_HOST_REPLICA
+              value: dev-backend-depositscore-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+            - name: SECRET_CONF
+              value: /vault/secrets/
+            - name: SERVICE_CONF
+              value: /config_files/config.json
+            - name: ENABLE_UPDATE_ACCT_DORMANCY_JOB_WORKER
+              value: "true"
+            - name: WORKER_MODE
+              value: "true"
+            - name: MANUAL_QUIT_ISTIO
+              value: "true"
+            - name: MANUAL_QUIT_VAULT
+              value: "true"
+            image: gcr.io/heptio-images/ks-guestbook-demo:0.2
+            imagePullPolicy: Always
+            name: deposits-core
+            resources:
+              limits:
+                memory: 256Mi
+              requests:
+                cpu: 350m
+                memory: 256Mi
+            securityContext: {}
+            volumeMounts:
+            - mountPath: /config_files
+              name: config-volume
+          restartPolicy: Never
+          securityContext:
+            fsGroup: 65532
+            runAsGroup: 65532
+            runAsNonRoot: true
+            runAsUser: 65532
+          serviceAccountName: release-name-deposits-core
+          volumes:
+          - configMap:
+              name: deposits-core-release-name
+            name: config-volume
+      ttlSecondsAfterFinished: 600
+  schedule: 0 0 30 02 *
+  suspend: false
+---
+# Source: deposits-core/templates/go-app.yaml
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: release-name-deposits-core
+spec:
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/istio-ingress/sa/istio-ingressgateway-service-account
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/core-banking/sa/account-service
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v1/casa-accounts
+        - /v2/casa-accounts
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /v1/casa-accounts*
+        - /health_check
+    - operation:
+        methods:
+        - PUT
+        paths:
+        - /v1/casa-accounts/*
+        - /v2/casa-accounts/*
+        - /v1/savings-pockets/status
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/core-banking/sa/deposits-exp
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v1/transfers
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/transfers
+        - /v1/casa-accounts/*
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/payments/sa/payment-core
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v1/transfers
+        - /v1/transfers/authorisations
+        - /v1/transfers/authorisations/*
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/operations/sa/payment-ops-trf
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v1/transfers
+        - /v1/transfers/authorisations
+        - /v1/transfers/authorisations/releases
+        - /v2/transfers
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/lending-platform/sa/iris
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/core-banking/sa/product-master
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v1/transfers
+        - /v1/transfers/authorisations
+        - /v1/transfers/authorisations/*
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/transfers
+        - /health_check
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: release-name
+      app.kubernetes.io/name: deposits-core
+---
+# Source: deposits-core/templates/go-app.yaml
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  annotations:
+    proxy.istio.io/config: '{"gatewayTopology" : { "numTrustedProxies": 1, "forwardClientCertDetails":
+      "ALWAYS_FORWARD_ONLY" } }'
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: release-name-deposits-core
+spec:
+  selector:
+    istio: ingress
+  servers:
+  - hosts:
+    - '*.ap-southeast-3.elb.amazonaws.com'
+    - debug.vanki.dev
+    port:
+      name: http
+      number: 80
+      protocol: HTTP
+---
+# Source: deposits-core/templates/go-app.yaml
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  labels:
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: deposits-core
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: deposits-core-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: deposits-core
+    tags.datadoghq.com/version: dev-9eceab4-10380866
+  name: release-name-deposits-core
+spec:
+  gateways:
+  - release-name-deposits-core
+  hosts:
+  - '*.ap-southeast-3.elb.amazonaws.com'
+  - debug.vanki.dev
+  http:
+  - match:
+    - uri:
+        prefix: /release-name-deposits-core/
+    name: release-name-deposits-core
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: release-name-deposits-core.default.svc.cluster.local
+---
+# Source: deposits-core/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "release-name-deposits-core-test-connection"
+  labels:
+    helm.sh/chart: deposits-core-0.1.0
+    app.kubernetes.io/name: deposits-core
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: "f30ee9e"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: gcr.io/heptio-images/ks-guestbook-demo:0.2
+      command: ['wget']
+      args: ['release-name-deposits-core:80']
+  restartPolicy: Never
