@@ -775,34 +775,6 @@ spec:
 ---
 # Source: account-service/templates/go-app.yaml
 apiVersion: networking.istio.io/v1beta1
-kind: Gateway
-metadata:
-  annotations:
-    proxy.istio.io/config: '{"gatewayTopology" : { "numTrustedProxies": 1, "forwardClientCertDetails":
-      "ALWAYS_FORWARD_ONLY" } }'
-  labels:
-    app.kubernetes.io/instance: account-service
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: account-service
-    app.kubernetes.io/version: f30ee9e
-    helm.sh/chart: account-service-0.1.0
-    tags.datadoghq.com/env: dev
-    tags.datadoghq.com/service: account-service
-    tags.datadoghq.com/version: dev-103e3ae-10399008
-  name: account-service
-spec:
-  selector:
-    istio: ingress
-  servers:
-  - hosts:
-    - backend.dev.g-bank.app
-    port:
-      name: https
-      number: 443
-      protocol: HTTP
----
-# Source: account-service/templates/go-app.yaml
-apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   labels:
