@@ -560,21 +560,21 @@ spec:
           value: /vault/secrets/
         - name: SERVICE_CONF
           value: /config_files/config.json
-        image: gcr.io/heptio-images/ks-guestbook-demo:0.2
+        image: docker.io/library/nginx:latest
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
-            path: /health_check
-            port: 8080
+            path: /
+            port: 80
         name: deposits-core
         ports:
-        - containerPort: 8080
+        - containerPort: 80
           name: http
           protocol: TCP
         readinessProbe:
           httpGet:
-            path: /health_check
-            port: 8080
+            path: /
+            port: 80
         resources:
           limits:
             memory: 128Mi
