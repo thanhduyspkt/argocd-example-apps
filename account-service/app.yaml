@@ -1,0 +1,1279 @@
+---
+# Source: account-service/templates/go-app.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: account-service
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: account-service-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: account-service
+    tags.datadoghq.com/version: dev-103e3ae-10399008
+  name: account-service
+---
+# Source: account-service/templates/configmap.yaml
+apiVersion: v1
+data:
+  config.json: |-
+    {
+      "name": "account-service Service",
+      "serviceName": "account-service",
+      "host": "0.0.0.0",
+      "port": 8080,
+      "env": "dev",
+      "ownerInfo": {
+        "name": "digibank",
+        "email": "digibank.tech@myteksi.com",
+        "url": "digibank.myteksi.com"
+      },
+      "data": {
+        "mysql": {
+          "master": {
+            "dsn": "{{as_username}}:{{as_password}}@tcp($MYSQL_HOST$:3306)/$DB_NAME$?parseTime=true&loc=UTC",
+            "maxIdle": 25,
+            "maxOpen": 50,
+            "connMaxLifetime": "1800s"
+          },
+          "slave": {
+            "dsn": "{{as_username}}:{{as_password}}@tcp($MYSQL_HOST_REPLICA$:3306)/$DB_NAME$?parseTime=true&loc=UTC",
+            "maxIdle": 25,
+            "maxOpen": 50,
+            "connMaxLifetime": "1800s"
+          },
+          "masterCircuitBreaker": {
+            "timeoutInMs": 1000
+          },
+          "slaveCircuitBreaker": {
+            "timeoutInMs": 1000
+          }
+        }
+      },
+      "statsd": {
+        "host": "$DOGSTATSD_HOST$",
+        "port": 8125
+      },
+      "trace": {
+        "host": "$DOGSTATSD_HOST$",
+        "port": 8126
+      },
+      "logger": {
+        "workerCount": 10,
+        "bufferSize": 10000,
+        "logLevel": 1,
+        "stacktraceLevel": 4,
+        "logFormat": "json",
+        "development": true
+      },
+      "accountServiceConfig": {
+        "productVariantCodeConfig": {
+          "depositAccount": "deposit_account",
+          "operatingAccount": "BIZ_DEPOSIT_ACCOUNT",
+          "savingsPocket": "SAVINGS_POCKET"
+        },
+        "clientConfig": {
+          "maxIdleConnsPerHost": 64,
+          "idleConnTimeoutInSMillis": 10000,
+          "timeoutInMillis": 4000,
+          "requestLogLockTimeoutInMillis": 5000
+        },
+        "savingsPocketConfig": {
+          "maxPocketLimit": 10
+        },
+        "pendingActivationThresholdInMinutes": 480,
+        "pendingFirstDepositThresholdInMinutes": 480,
+        "pendingActivationAutoCloseReminder": {
+          "reminderText": ["1", "3", "5"],
+          "reminderTimeInMinutes": [60, 180, 300],
+          "bufferTimeInHours": 1,
+          "_bufferTimeInHours": "A window starting after (threshold + reminder) time, account within (threshold + reminder) time and buffer time will received notifications"
+        },
+        "pendingFirstDepositAutoCloseReminder": {
+          "reminderText": ["1 Hour", "3 Hours", "5 Hours"],
+          "reminderTimeInMinutes": [60, 180, 300],
+          "bufferTimeInHours": 1,
+          "_bufferTimeInHours": "A window starting after (threshold + reminder) time, account within (threshold + reminder) time and buffer time will received notifications"
+        },
+        "accountStatus": {
+          "disableCloseFromHour": "16:00",
+          "disableCloseFromHour.description": "The hour format should be something like 23:00 and will be parsed as UTC time",
+          "disableCloseDurationSecond": 10800
+        }
+      },
+      "depositsAccountCreationEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-account-creation-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-account-creation-event",
+        "packageName": "pb",
+        "dtoName": "DepositsAccountCreateEvent",
+        "offsetType": "oldest",
+        "maxRetryCount": 5,
+        "delayInMilliSeconds": 100,
+        "enabled": true
+      },
+      "depositsAccountCreatedEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-account-created-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-account-created-event",
+        "packageName": "pb",
+        "dtoName": "DepositsAccountCreateEvent",
+        "syncprod": true,
+        "requiredAcks": -1
+      },
+      "locAccountEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "stream": "dev-loan-core-loc-account",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "offsetType": "oldest",
+        "clientID": "account-service-client-dev",
+        "packageName": "pb",
+        "dtoName": "LoanCoreLoc"
+      },
+      "accountUpdateKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-update-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-account-update-event",
+        "packageName": "pb",
+        "dtoName": "AccountStatusUpdateEvent",
+        "offsetType": "oldest"
+      },
+      "dormantAccountEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-dormant-account-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-dormant-account-event",
+        "packageName": "pb",
+        "dtoName": "DepositsDormantAccount",
+        "offsetType": "oldest"
+      },
+      "depositsAccountDetailEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-account-detail-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-account-detail-event",
+        "packageName": "pb",
+        "dtoName": "AccountDetail",
+        "offsetType": "oldest"
+      },
+      "depositsPostingBatchEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-service-deposits-posting-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-core-tx",
+        "packageName": "pb",
+        "dtoName": "DepositsCoreTx",
+        "offsetType": "oldest"
+      },
+      "pocketLifecycleEventKafkaConfig" : {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-service-client-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-pocket-lifecycle-event",
+        "packageName": "pb",
+        "dtoName": "PocketLifecycle",
+        "offsetType": "oldest"
+      },
+      "customerJournalEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-service-client-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-audit-log",
+        "packageName": "pb",
+        "dtoName": "AuditLog",
+        "offsetType": "oldest"
+      },
+      "accountPendingActionKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-service-client-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-account-pending-action-event",
+        "packageName": "pb",
+        "dtoName": "AccountPendingAction",
+        "offsetType": "oldest"
+      },
+      "depositsAccountStatusUpdateEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-status-update-event-dev",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "dev-deposits-core-account-status-update-event",
+        "packageName": "pb",
+        "dtoName": "DepositsAccountStatusUpdateEvent",
+        "offsetType": "oldest",
+        "maxRetryCount": 5,
+        "delayInMilliSeconds": 100,
+        "enable": true
+      },
+      "depositsCoreConfig": {
+        "baseURL": "http://deposits-core.core-banking.svc.cluster.local"
+      },
+      "depositsExpConfig": {
+        "baseURL": "http://deposits-exp.core-banking.svc.cluster.local"
+      },
+      "customerMasterConfig": {
+        "baseURL": "http://customer-master.onboarding.svc.cluster.local"
+      },
+      "goalCoreConfig": {
+        "baseURL": "http://goal-core.core-banking.svc.cluster.local",
+        "maxGoalAmountInCent": 999999999
+      },
+      "productMasterConfig": {
+        "baseURL": "http://product-master.core-banking.svc.cluster.local"
+      },
+      "hermesConfig": {
+        "baseURL": "http://hermes.hermes.svc.cluster.local"
+      },
+      "pigeonConfig": {
+        "baseURL": "http://pigeon.pigeon.svc.cluster.local"
+      },
+      "loanCoreConfig": {
+        "baseURL": "http://loan-core.lending-platform.svc.cluster.local"
+      },
+      "appian": {
+        "hostAddress": "https://dbmydev.gforce.g-bank.app",
+        "clientID": "account-service",
+        "circuitConfig": {
+          "appian": {
+            "timeout": 15
+          }
+        },
+        "registeredClientID" : "{{APPIAN_CLIENT_ID}}",
+        "registeredClientSecret" : "{{APPIAN_CLIENT_SECRET}}",
+        "grantType": "client_credentials",
+        "limitCreationCallbackEndpoint" : "/suite/webapi/lending/event/limit-creation"
+      },
+      "workflowRetryConfig": {
+        "enabled": true,
+        "createCASAAccountV3": {
+          "transactional": {
+            "intervalInSeconds": 30,
+            "maxAttempt": 10
+          }
+        },
+        "createLOCAccount": {
+          "transactional": {
+            "intervalInSeconds": 30,
+            "maxAttempt": 10
+          },
+          "auxiliary": {
+            "intervalInSeconds": 30,
+            "maxAttempt": 5
+          }
+        },
+        "deactivateLOCAccount": {
+          "auxiliary": {
+            "intervalInSeconds": 30,
+            "maxAttempt": 10
+          }
+        },
+        "closeLOCAccount": {
+          "transactional": {
+            "intervalInSeconds": 30,
+            "maxAttempt": 10
+          }
+        },
+        "updateCASAAccountStatusV2": {
+          "transactional": {
+            "intervalInSeconds": 30,
+            "maxAttempt": 10
+          }
+        }
+      },
+      "featureFlags": {
+        "enableR2": true,
+        "enableNewFVInGoalEstimation": false,
+        "enableClientCloseConnHandling": true,
+        "_enableClientCloseConnHandling": "this is a release feature flag, it should be clean up after release",
+        "enableAccountPendingActionPublisher": true,
+        "_enableAccountPendingActionPublisher": "this is a release feature flag, it should be clean up after release",
+        "enableRemoveSchedulerInAsync": false,
+        "_enableRemoveSchedulerInAsync": "this is a release feature flag to enable the remove scheduler flow in async way, it should be clean up after release",
+        "enableReplicaRead": false,
+        "enableLending": true,
+        "enableAsyncAccountClosure": true,
+        "enableAsyncAccountCreation": true,
+        "enableBiz": false,
+        "enableBizFlexiCredit": true,
+        "enableBIZAuthorisation": true
+      },
+      "tenant": "MY",
+      "locale": {
+        "currency" : "MYR",
+        "countryCode": "MY"
+      },
+      "workerConfig": {
+        "closePendingActivationAccountConf": {
+          "lockDurationInMinutes": 10,
+          "cronExpression": "*/15 * * * *",
+          "enabled": false
+        },
+        "closePendingFirstDepositAccountConf": {
+          "lockDurationInMinutes": 10,
+          "cronExpression": "0 17 * * *",
+          "enabled": false
+        },
+        "pendingActivationAutoCloseReminderNotificationConf": {
+          "lockDurationInMinutes": 200,
+          "cronExpression": "0 */1 * * *",
+          "enabled": true,
+          "rateLimitMilliSecond": 150
+        },
+        "pendingFirstDepositAutoCloseReminderNotificationConf": {
+          "lockDurationInMinutes": 200,
+          "cronExpression": "0 */1 * * *",
+          "enabled": false,
+          "rateLimitMilliSecond": 150
+        }
+      },
+      "redisConfig": {
+        "addr": "clustercfg.dbmy-dev-backend-ec-account-service.o9f56r.apse1.cache.amazonaws.com:6379",
+        "idleTimeoutInSec": 1,
+        "poolSize": 300,
+        "readOnlyFromSlaves": false,
+        "readTimeoutInSec": 1,
+        "writeTimeoutInSec": 1,
+        "password": "{{ REDIS_PASSWORD }}",
+        "tlsEnabled": true
+      },
+      "notificationConfig": {
+        "holdcodeAccountBlockNotification": {
+          "PushTemplate": "",
+          "EmailTemplate": "holdcode_email_block_account"
+        },
+        "holdcodeAccountLockNotification": {
+          "PushTemplate": "",
+          "EmailTemplate": "holdcode_email_lock_account"
+        },
+        "holdcodeAccountUnblockNotification": {
+          "PushTemplate": "holdcode_push_unblock_account",
+          "EmailTemplate": "holdcode_email_unblock_account"
+        },
+        "holdcodeAccountUnlockNotification": {
+          "PushTemplate": "holdcode_push_unlock_account",
+          "EmailTemplate": "holdcode_email_unlock_account"
+        },
+        "savingsPocketClosureNotification": {
+          "PushTemplate": "",
+          "EmailTemplate": "",
+          "_note": "Notification for pocket open and closed is currently disabled hence empty template value"
+        },
+        "savingsPocketCreationNotification": {
+          "PushTemplate": "",
+          "EmailTemplate": "",
+          "_note": "Notification for pocket open and closed is currently disabled hence empty template value"
+        },
+        "pendingActivationAutoCloseReminderNotification": {
+          "PushTemplate": "pending_activation_auto_close_reminder_push",
+          "EmailTemplate": "pending_first_fund_auto_close_reminder_email"
+        },
+        "pendingFirstFundAutoCloseReminderNotification": {
+          "PushTemplate": "pending_action_auto_close_reminder_push",
+          "EmailTemplate": "pending_first_fund_auto_close_reminder_email"
+        },
+        "holdCodeBankRestrictedBlockAccountNotification": {
+          "PushTemplate": "holdcode_push_bank_restricted_block_account",
+          "EmailTemplate": "holdcode_email_bank_restricted_block_account"
+        },
+        "holdCodeBankRestrictedUnblockAccountNotification": {
+          "PushTemplate": "holdcode_push_bank_restricted_unblock_account",
+          "EmailTemplate": "holdcode_email_bank_restricted_unblock_account"
+        }
+      }
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: account-service
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: account-service-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: account-service
+    tags.datadoghq.com/version: dev-103e3ae-10399008
+  name: account-service-account-service
+---
+# Source: account-service/templates/go-app.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: account-service
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: account-service-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: account-service
+    tags.datadoghq.com/version: dev-103e3ae-10399008
+  name: account-service
+spec:
+  ports:
+  - appProtocol: http
+    name: http-account-service
+    nodePort: null
+    port: 80
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/name: account-service
+  type: ClusterIP
+---
+# Source: account-service/templates/go-app.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: account-service
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: account-service-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: account-service
+    tags.datadoghq.com/version: dev-103e3ae-10399008
+  name: account-service
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: account-service
+      app.kubernetes.io/name: account-service
+  template:
+    metadata:
+      annotations:
+        apm.datadoghq.com/env: '{ "DD_SERVICE": "account-service" }'
+        checksum/config: 88e76361c818efffaf38fba0acda74bd1abd0a77685cb20b44e06137d5f3fb5d
+        vault.hashicorp.com/agent-cache-enable: "true"
+        vault.hashicorp.com/agent-init-first: "true"
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-inject-secret-account_service_appian_creds.json: kv2/data/core-experience/app/account-service/appian/client-credentials
+        vault.hashicorp.com/agent-inject-secret-account_service_db_creds.json: database/creds/dev-backend-accountservice-rds-mysql-dba
+        vault.hashicorp.com/agent-inject-secret-redis_creds.json: kv/data/security/tf/dev/account-service/ec/auth
+        vault.hashicorp.com/agent-inject-template-account_service_appian_creds.json: |
+          {{ with secret "kv2/data/core-experience/app/account-service/appian/client-credentials" -}}
+            {
+              "APPIAN_CLIENT_ID": "{{ .Data.data.client_id }}",
+              "APPIAN_CLIENT_SECRET": "{{ .Data.data.client_secret }}"
+            }
+          {{- end }}
+        vault.hashicorp.com/agent-inject-template-account_service_db_creds.json: |
+          {{ with secret "database/creds/dev-backend-accountservice-rds-mysql-dba" -}}
+            {
+              "as_username": "{{ .Data.username }}",
+              "as_password": "{{ .Data.password }}"
+            }
+          {{- end }}
+        vault.hashicorp.com/agent-inject-template-redis_creds.json: |
+          {{ with secret "kv/data/security/tf/dev/account-service/ec/auth" -}}
+            {
+              "REDIS_PASSWORD": "{{ .Data.auth_token }}"
+            }
+          {{- end }}
+        vault.hashicorp.com/client-max-retries: "15"
+        vault.hashicorp.com/log-format: json
+        vault.hashicorp.com/log-level: trace
+        vault.hashicorp.com/role: account-service
+        vault.hashicorp.com/template-static-secret-render-interval: 14400m
+      labels:
+        app.kubernetes.io/instance: account-service
+        app.kubernetes.io/name: account-service
+        tags.datadoghq.com/env: dev
+        tags.datadoghq.com/service: account-service
+        tags.datadoghq.com/version: dev-103e3ae-10399008
+    spec:
+      containers:
+      - env:
+        - name: DOGSTATSD_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: DD_ENTITY_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        - name: DB_NAME
+          value: account_service_dev
+        - name: MOCK_DISABLE_PENDING_ACTIVATION
+          value: "true"
+        - name: MYSQL_HOST
+          value: dev-backend-accountservice-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+        - name: MYSQL_HOST_REPLICA
+          value: dev-backend-accountservice-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+        - name: SECRET_CONF
+          value: /vault/secrets/
+        - name: SERVICE_CONF
+          value: /config_files/config.json
+        image: nginx:latest
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /health_check
+            port: 8080
+        name: account-service
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /health_check
+            port: 8080
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 25m
+            memory: 200Mi
+        securityContext: {}
+        volumeMounts:
+        - mountPath: /config_files
+          name: config-volume
+      initContainers: null
+      nodeSelector: null
+      securityContext:
+        fsGroup: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+      serviceAccountName: account-service
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: account-service
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - configMap:
+          name: account-service-account-service
+        name: config-volume
+---
+# Source: account-service/templates/go-app.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  labels:
+    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: account-service
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: account-service-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: account-service
+    tags.datadoghq.com/version: dev-103e3ae-10399008
+  name: account-service
+spec:
+  maxReplicas: 4
+  metrics:
+  - resource:
+      name: memory
+      target:
+        averageUtilization: 75
+        type: Utilization
+    type: Resource
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 75
+        type: Utilization
+    type: Resource
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: account-service
+---
+# Source: account-service/templates/go-app.yaml
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  labels:
+    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: account-service
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: account-service-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: account-service
+    tags.datadoghq.com/version: dev-103e3ae-10399008
+  name: account-service
+spec:
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/istio-ingress/sa/istio-ingressgateway-service-account
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/sentry-t6/sa/sentry-t6
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/casa-accounts
+        - /v2/accounts/list
+        - /v1/savings-pockets/goal
+        - /v1/savings-pockets/get-goal
+        - /v1/savings-pockets/goal/estimate
+        - /v2/savings-pockets/summary
+        - /v2/savings-pockets/pocket-detail
+        - /v1/lending/loc/close
+    - operation:
+        methods:
+        - PUT
+        paths:
+        - /v1/casa-accounts/*
+        - /v2/casa-accounts/*
+        - /v1/savings-pockets/name
+        - /v1/savings-pockets/image
+        - /v1/savings-pockets/status-close
+        - /v1/savings-pockets/goal
+        - /v1/savings-pockets/goal/status-close
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+        - /v1/lending/account-bank-details
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/sentry-t6/sa/sentry-partner-t6/product-master
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /health_check
+    - operation:
+        methods:
+        - PUT
+        paths:
+        - /v1/casa-accounts/*
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/operations/sa/customer-portal
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+        - /v2/savings-pockets/summary
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /v1/accounts/*
+        - /health_check
+    - operation:
+        methods:
+        - PUT
+        paths:
+        - /v1/casa-accounts/*
+        - /v2/casa-accounts/*
+        - /v1/savings-pockets/status
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/onboarding/sa/customer-experience
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/casa-accounts
+        - /v2/accounts/get
+        - /v2/accounts/list
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+    - operation:
+        methods:
+        - PUT
+        paths:
+        - /v1/casa-accounts/*
+        - /v2/casa-accounts/*
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/core-banking/sa/deposits-exp
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/savings-pockets/pocket-detail
+        - /v2/accounts/list
+    - operation:
+        methods:
+        - PUT
+        paths:
+        - /v1/savings-pockets/image
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/core-banking/sa/deposits-core
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/accounts/*
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/savings-pockets/pocket-detail
+        - /v2/accounts/get
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/core-banking/sa/transaction-history
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /v1/accounts/*
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/core-banking/sa/transaction-statements
+        - cluster.local/ns/core-banking/sa/statements-gen-worker
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/payments/sa/transaction-limit
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/payments/sa/partnerpay-engine
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/payments/sa/payment-engine
+        - cluster.local/ns/payments/sa/qr-service
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/payments/sa/payment-experience
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/payments/sa/pairing-service
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/payments/sa/pay-authz
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/payments/sa/payment-core
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/operations/sa/payment-ops-trf
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/cards/sa/digicard-core
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/cards/sa/digicard-txn
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/fintrust/sa/risk-broker
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/identity/sa/id-exp
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+    - operation:
+        methods:
+        - PUT
+        paths:
+        - /v1/casa-accounts/*
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/operations/sa/helpctr-exp
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/fintrust/sa/gd-proxy
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/loyalty/sa/rewards-gateway
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+        - /v2/accounts/list
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/loki/sa/loki
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/get
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/lending-platform/sa/loan-core
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v1/lending/term-loan/create
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+    - operation:
+        methods:
+        - PUT
+        paths:
+        - /v1/lending/term-loan/status
+        - /v1/lending/loc/status
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/lending-platform/sa/loan-exp
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/list
+        - /v1/lending/term-loan/create
+    - operation:
+        methods:
+        - PUT
+        paths:
+        - /v1/casa-accounts/*
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /v1/casa-accounts/*
+        - /v1/accounts/*
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/lending-platform/sa/loan-app
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/list
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/insurance/sa/insurance-exp
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v2/accounts/list
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/partner-gateway/sa/sentry-partner-t6
+    to:
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v1/lending/loc/create
+    - operation:
+        methods:
+        - POST
+        paths:
+        - /v1/lending/loc/deactivate
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/lending-platform/sa/iris
+    to:
+    - operation:
+        methods:
+        - GET
+        paths:
+        - /health_check
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: account-service
+      app.kubernetes.io/name: account-service
+---
+# Source: account-service/templates/go-app.yaml
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  annotations:
+    proxy.istio.io/config: '{"gatewayTopology" : { "numTrustedProxies": 1, "forwardClientCertDetails":
+      "ALWAYS_FORWARD_ONLY" } }'
+  labels:
+    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: account-service
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: account-service-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: account-service
+    tags.datadoghq.com/version: dev-103e3ae-10399008
+  name: account-service
+spec:
+  selector:
+    istio: ingress
+  servers:
+  - hosts:
+    - backend.dev.g-bank.app
+    port:
+      name: https
+      number: 443
+      protocol: HTTP
+---
+# Source: account-service/templates/go-app.yaml
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  labels:
+    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: account-service
+    app.kubernetes.io/version: f30ee9e
+    helm.sh/chart: account-service-0.1.0
+    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/service: account-service
+    tags.datadoghq.com/version: dev-103e3ae-10399008
+  name: account-service
+spec:
+  gateways:
+  - account-service
+  hosts:
+  - backend.dev.g-bank.app
+  http:
+  - match:
+    - uri:
+        prefix: /account-service/
+    name: account-service
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: account-service.gitlab.svc.cluster.local
+---
+# Source: account-service/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "account-service-test-connection"
+  labels:
+    helm.sh/chart: account-service-0.1.0
+    app.kubernetes.io/name: account-service
+    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/version: "f30ee9e"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox-1.33.1
+      command: ['wget']
+      args: ['account-service:80']
+  restartPolicy: Never
