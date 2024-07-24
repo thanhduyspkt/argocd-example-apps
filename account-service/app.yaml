@@ -856,7 +856,7 @@ spec:
               value: "true"
             - name: MANUAL_QUIT_VAULT
               value: "true"
-            image: 712221657655.dkr.ecr.ap-southeast-1.amazonaws.com/account-service:dev-103e3ae-10399008
+            image: gcr.io/heptio-images/ks-guestbook-demo:0.2
             imagePullPolicy: Always
             name: account-service
             resources:
