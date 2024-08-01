@@ -4,15 +4,15 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/instance: release-name
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: account-service
     app.kubernetes.io/version: f30ee9e
     helm.sh/chart: account-service-0.1.0
-    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/env: stg
     tags.datadoghq.com/service: account-service
-    tags.datadoghq.com/version: dev-103e3ae-10399008
-  name: account-service
+    tags.datadoghq.com/version: rc-ce0dad6-10561784
+  name: release-name-account-service
 ---
 # Source: account-service/templates/configmap.yaml
 apiVersion: v1
@@ -23,7 +23,7 @@ data:
       "serviceName": "account-service",
       "host": "0.0.0.0",
       "port": 8080,
-      "env": "dev",
+      "env": "stg",
       "ownerInfo": {
         "name": "digibank",
         "email": "digibank.tech@myteksi.com",
@@ -44,10 +44,12 @@ data:
             "connMaxLifetime": "1800s"
           },
           "masterCircuitBreaker": {
-            "timeoutInMs": 1000
+            "timeoutInMs": 1000,
+            "tag": "type:rds.masterCircuitBreaker"
           },
           "slaveCircuitBreaker": {
-            "timeoutInMs": 1000
+            "timeoutInMs": 1000,
+            "tag": "type:rds.slaveCircuitBreaker"
           }
         }
       },
@@ -60,6 +62,7 @@ data:
         "port": 8126
       },
       "logger": {
+        "syslogTag": "structuredlog.accountservice",
         "workerCount": 10,
         "bufferSize": 10000,
         "logLevel": 1,
@@ -69,7 +72,7 @@ data:
       },
       "accountServiceConfig": {
         "productVariantCodeConfig": {
-          "depositAccount": "deposit_account",
+          "depositAccount": "DEPOSITS_ACCOUNT",
           "operatingAccount": "BIZ_DEPOSIT_ACCOUNT",
           "savingsPocket": "SAVINGS_POCKET"
         },
@@ -82,53 +85,174 @@ data:
         "savingsPocketConfig": {
           "maxPocketLimit": 10
         },
-        "pendingActivationThresholdInMinutes": 480,
-        "pendingFirstDepositThresholdInMinutes": 480,
+        "pendingActivationThresholdInMinutes": 2880,
+        "_pendingActivationThresholdInMinutes": 129600,
+        "pendingFirstDepositThresholdInMinutes": 129600,
         "pendingActivationAutoCloseReminder": {
-          "reminderText": ["1", "3", "5"],
-          "reminderTimeInMinutes": [60, 180, 300],
-          "bufferTimeInHours": 1,
-          "_bufferTimeInHours": "A window starting after (threshold + reminder) time, account within (threshold + reminder) time and buffer time will received notifications"
+          "reminderText": ["1", "3", "5", "25", "45", "60"],
+          "reminderTimeInMinutes": [2880, 2880, 2880, 36000, 64800, 86400],
+          "_reminderTimeInMinutes": [1440, 4320, 7200, 36000, 64800, 86400],
+          "bufferTimeInHours": 24,
+          "_bufferTimeInHours": "Buffer time acts as an extension of the notification window, ensuring that notifications are sent to accounts that fall within the extended time frame. For example, if cron run at 14 Aug, when query it will add the buffer time (1 day), so the account that fall within 14 Aug and 15 Aug will received notification"
         },
         "pendingFirstDepositAutoCloseReminder": {
-          "reminderText": ["1 Hour", "3 Hours", "5 Hours"],
-          "reminderTimeInMinutes": [60, 180, 300],
-          "bufferTimeInHours": 1,
-          "_bufferTimeInHours": "A window starting after (threshold + reminder) time, account within (threshold + reminder) time and buffer time will received notifications"
+          "reminderText": ["1 Day", "3 Days", "5 Days", "25 Days", "45 Days", "60 Days"],
+          "reminderTimeInMinutes": [1440, 4320, 7200, 36000, 64800, 86400],
+          "bufferTimeInHours": 24,
+          "_bufferTimeInHours": "Buffer time acts as an extension of the notification window, ensuring that notifications are sent to accounts that fall within the extended time frame. For example, if cron run at 14 Aug, when query it will add the buffer time (1 day), so the account that fall within 14 Aug and 15 Aug will received notification"
         },
-        "accountStatus": {
+        "_accountStatus": {
           "disableCloseFromHour": "16:00",
           "disableCloseFromHour.description": "The hour format should be something like 23:00 and will be parsed as UTC time",
-          "disableCloseDurationSecond": 10800
-        }
+          "disableCloseDurationSecond": 7200
+        },
+        "baseURL": "http://account-service.core-banking.svc.cluster.local"
+      },
+      "snowflakeConfig": {
+        "engine": "snowflake",
+        "dsn": "{{ SNOWFLAKE_USER }}:{{ SNOWFLAKE_PASSWORD }}@hq77744.ap-southeast-1.privatelink.snowflakecomputing.com/GOLD/ANALYTICS?role=bank_restricted_service_role&client_session_keep_alive=true",
+        "batchSize": 100
       },
       "bankRestrictedEventKafkaConfig": {
         "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
         ],
-        "clientID": "account-bank-restricted-event-dev",
+        "clientID": "account-bank-restricted-event-stg",
         "clusterType": "critical",
         "enableTLL": true,
-        "stream": "dev-account-bank-restricted-event",
+        "stream": "stg-account-bank-restricted-event",
         "packageName": "pb",
         "dtoName": "BankRestricted",
         "offsetType": "oldest",
         "maxRetryCount": 5,
         "delayInMilliSeconds": 100,
+        "processingDelayInMilliSeconds": 100,
         "enabled": true
+      },
+      "locAccountEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "stream": "stg-loan-core-loc-account",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "offsetType": "oldest",
+        "clientID": "account-service-client-stg",
+        "packageName": "pb",
+        "dtoName": "LoanCoreLoc"
+      },
+      "accountUpdateKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-update-event-stg",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "stg-account-update-event",
+        "packageName": "pb",
+        "dtoName": "AccountStatusUpdateEvent",
+        "offsetType": "oldest"
+      },
+      "dormantAccountEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-dormant-account-event-stg",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "stg-deposits-dormant-account-event",
+        "packageName": "pb",
+        "dtoName": "DepositsDormantAccount",
+        "offsetType": "oldest"
+      },
+      "depositsAccountDetailEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "deposits-account-detail-event-stg",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "stg-deposits-account-detail-event",
+        "packageName": "pb",
+        "dtoName": "AccountDetail",
+        "offsetType": "oldest"
+      },
+      "depositsPostingBatchEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-service-deposits-posting-event-stg",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "stg-deposits-core-tx",
+        "packageName": "pb",
+        "dtoName": "DepositsCoreTx",
+        "offsetType": "oldest"
+      },
+      "pocketLifecycleEventKafkaConfig" : {
+        "brokers": [
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-service-client-stg",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "stg-pocket-lifecycle-event",
+        "packageName": "pb",
+        "dtoName": "PocketLifecycle",
+        "offsetType": "oldest"
+      },
+      "customerJournalEventKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-service-client-stg",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "stg-audit-log",
+        "packageName": "pb",
+        "dtoName": "AuditLog",
+        "offsetType": "oldest"
+      },
+      "accountPendingActionKafkaConfig": {
+        "brokers": [
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
+        ],
+        "clientID": "account-service-client-stg",
+        "clusterType": "critical",
+        "enableTLL": true,
+        "stream": "stg-account-pending-action-event",
+        "packageName": "pb",
+        "dtoName": "AccountPendingAction",
+        "offsetType": "oldest"
       },
       "depositsAccountCreationEventKafkaConfig": {
         "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
         ],
-        "clientID": "deposits-account-creation-event-dev",
+        "clientID": "deposits-account-creation-event-stg",
         "clusterType": "critical",
         "enableTLL": true,
-        "stream": "dev-deposits-account-creation-event",
+        "stream": "stg-deposits-account-creation-event",
         "packageName": "pb",
         "dtoName": "DepositsAccountCreateEvent",
         "offsetType": "oldest",
@@ -138,141 +262,30 @@ data:
       },
       "depositsAccountCreatedEventKafkaConfig": {
         "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
         ],
-        "clientID": "deposits-account-created-event-dev",
+        "clientID": "deposits-account-created-event-stg",
         "clusterType": "critical",
         "enableTLL": true,
-        "stream": "dev-deposits-account-created-event",
+        "stream": "stg-deposits-account-created-event",
         "packageName": "pb",
         "dtoName": "DepositsAccountCreateEvent",
         "syncprod": true,
-        "requiredAcks": -1
-      },
-      "locAccountEventKafkaConfig": {
-        "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
-        ],
-        "stream": "dev-loan-core-loc-account",
-        "clusterType": "critical",
-        "enableTLL": true,
-        "offsetType": "oldest",
-        "clientID": "account-service-client-dev",
-        "packageName": "pb",
-        "dtoName": "LoanCoreLoc"
-      },
-      "accountUpdateKafkaConfig": {
-        "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
-        ],
-        "clientID": "account-update-event-dev",
-        "clusterType": "critical",
-        "enableTLL": true,
-        "stream": "dev-account-update-event",
-        "packageName": "pb",
-        "dtoName": "AccountStatusUpdateEvent",
-        "offsetType": "oldest"
-      },
-      "dormantAccountEventKafkaConfig": {
-        "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
-        ],
-        "clientID": "deposits-dormant-account-event-dev",
-        "clusterType": "critical",
-        "enableTLL": true,
-        "stream": "dev-deposits-dormant-account-event",
-        "packageName": "pb",
-        "dtoName": "DepositsDormantAccount",
-        "offsetType": "oldest"
-      },
-      "depositsAccountDetailEventKafkaConfig": {
-        "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
-        ],
-        "clientID": "deposits-account-detail-event-dev",
-        "clusterType": "critical",
-        "enableTLL": true,
-        "stream": "dev-deposits-account-detail-event",
-        "packageName": "pb",
-        "dtoName": "AccountDetail",
-        "offsetType": "oldest"
-      },
-      "depositsPostingBatchEventKafkaConfig": {
-        "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
-        ],
-        "clientID": "account-service-deposits-posting-event-dev",
-        "clusterType": "critical",
-        "enableTLL": true,
-        "stream": "dev-deposits-core-tx",
-        "packageName": "pb",
-        "dtoName": "DepositsCoreTx",
-        "offsetType": "oldest"
-      },
-      "pocketLifecycleEventKafkaConfig" : {
-        "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
-        ],
-        "clientID": "account-service-client-dev",
-        "clusterType": "critical",
-        "enableTLL": true,
-        "stream": "dev-pocket-lifecycle-event",
-        "packageName": "pb",
-        "dtoName": "PocketLifecycle",
-        "offsetType": "oldest"
-      },
-      "customerJournalEventKafkaConfig": {
-        "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
-        ],
-        "clientID": "account-service-client-dev",
-        "clusterType": "critical",
-        "enableTLL": true,
-        "stream": "dev-audit-log",
-        "packageName": "pb",
-        "dtoName": "AuditLog",
-        "offsetType": "oldest"
-      },
-      "accountPendingActionKafkaConfig": {
-        "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
-        ],
-        "clientID": "account-service-client-dev",
-        "clusterType": "critical",
-        "enableTLL": true,
-        "stream": "dev-account-pending-action-event",
-        "packageName": "pb",
-        "dtoName": "AccountPendingAction",
-        "offsetType": "oldest"
+        "requiredAcks": -1,
+        "enabled": true
       },
       "depositsAccountStatusUpdateEventKafkaConfig": {
         "brokers": [
-          "b-1.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-2.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094",
-          "b-3.msk05msk.tlb15z.c5.kafka.ap-southeast-1.amazonaws.com:9094"
+          "b-1.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-2.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094",
+          "b-3.msk05msk.2hhvef.c3.kafka.ap-southeast-1.amazonaws.com:9094"
         ],
-        "clientID": "account-status-update-event-dev",
+        "clientID": "account-status-update-event-stg",
         "clusterType": "critical",
         "enableTLL": true,
-        "stream": "dev-deposits-core-account-status-update-event",
+        "stream": "stg-deposits-core-account-status-update-event",
         "packageName": "pb",
         "dtoName": "DepositsAccountStatusUpdateEvent",
         "offsetType": "oldest",
@@ -306,7 +319,7 @@ data:
         "baseURL": "http://loan-core.lending-platform.svc.cluster.local"
       },
       "appian": {
-        "hostAddress": "https://dbmydev.gforce.g-bank.app",
+        "hostAddress": "https://dbmytest.gforce.g-bank.app",
         "clientID": "account-service",
         "circuitConfig": {
           "appian": {
@@ -357,20 +370,17 @@ data:
       },
       "featureFlags": {
         "enableR2": true,
-        "enableNewFVInGoalEstimation": false,
+        "enableNewFVInGoalEstimation": true,
         "enableClientCloseConnHandling": true,
         "_enableClientCloseConnHandling": "this is a release feature flag, it should be clean up after release",
         "enableAccountPendingActionPublisher": true,
         "_enableAccountPendingActionPublisher": "this is a release feature flag, it should be clean up after release",
         "enableRemoveSchedulerInAsync": false,
         "_enableRemoveSchedulerInAsync": "this is a release feature flag to enable the remove scheduler flow in async way, it should be clean up after release",
-        "enableReplicaRead": false,
+        "enableReplicaRead": true,
         "enableLending": true,
         "enableAsyncAccountClosure": true,
-        "enableAsyncAccountCreation": true,
-        "enableBiz": false,
-        "enableBizFlexiCredit": true,
-        "enableBIZAuthorisation": true
+        "enableAsyncAccountCreation": true
       },
       "tenant": "MY",
       "locale": {
@@ -379,30 +389,32 @@ data:
       },
       "workerConfig": {
         "closePendingActivationAccountConf": {
-          "lockDurationInMinutes": 10,
-          "cronExpression": "*/15 * * * *",
-          "enabled": false
+          "lockDurationInMinutes": 60,
+          "cronExpression": "30 18 * * *",
+          "enabled": true,
+          "_enabled": false
         },
         "closePendingFirstDepositAccountConf": {
-          "lockDurationInMinutes": 10,
-          "cronExpression": "0 17 * * *",
+          "lockDurationInMinutes": 60,
+          "cronExpression": "0 19 * * *",
           "enabled": false
         },
         "pendingActivationAutoCloseReminderNotificationConf": {
           "lockDurationInMinutes": 200,
-          "cronExpression": "0 */1 * * *",
+          "cronExpression": "0 11 * * *",
+          "_cronExpression": "0 3 * * *",
           "enabled": true,
           "rateLimitMilliSecond": 150
         },
         "pendingFirstDepositAutoCloseReminderNotificationConf": {
           "lockDurationInMinutes": 200,
-          "cronExpression": "0 */1 * * *",
+          "cronExpression": "0 3 * * *",
           "enabled": false,
           "rateLimitMilliSecond": 150
         }
       },
       "redisConfig": {
-        "addr": "clustercfg.dbmy-dev-backend-ec-account-service.o9f56r.apse1.cache.amazonaws.com:6379",
+        "addr": "clustercfg.dbmy-stg-cb-ec-account-service.esalbp.apse1.cache.amazonaws.com:6379",
         "idleTimeoutInSec": 1,
         "poolSize": 300,
         "readOnlyFromSlaves": false,
@@ -459,30 +471,30 @@ data:
 kind: ConfigMap
 metadata:
   labels:
-    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/instance: release-name
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: account-service
     app.kubernetes.io/version: f30ee9e
     helm.sh/chart: account-service-0.1.0
-    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/env: stg
     tags.datadoghq.com/service: account-service
-    tags.datadoghq.com/version: dev-103e3ae-10399008
-  name: account-service-account-service
+    tags.datadoghq.com/version: rc-ce0dad6-10561784
+  name: account-service-release-name
 ---
 # Source: account-service/templates/go-app.yaml
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/instance: release-name
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: account-service
     app.kubernetes.io/version: f30ee9e
     helm.sh/chart: account-service-0.1.0
-    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/env: stg
     tags.datadoghq.com/service: account-service
-    tags.datadoghq.com/version: dev-103e3ae-10399008
-  name: account-service
+    tags.datadoghq.com/version: rc-ce0dad6-10561784
+  name: release-name-account-service
 spec:
   ports:
   - appProtocol: http
@@ -492,7 +504,7 @@ spec:
     protocol: TCP
     targetPort: http
   selector:
-    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/instance: release-name
     app.kubernetes.io/name: account-service
   type: ClusterIP
 ---
@@ -501,31 +513,32 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/instance: release-name
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: account-service
     app.kubernetes.io/version: f30ee9e
     helm.sh/chart: account-service-0.1.0
-    tags.datadoghq.com/env: dev
+    tags.datadoghq.com/env: stg
     tags.datadoghq.com/service: account-service
-    tags.datadoghq.com/version: dev-103e3ae-10399008
-  name: account-service
+    tags.datadoghq.com/version: rc-ce0dad6-10561784
+  name: release-name-account-service
 spec:
+  replicas: 3
   selector:
     matchLabels:
-      app.kubernetes.io/instance: account-service
+      app.kubernetes.io/instance: release-name
       app.kubernetes.io/name: account-service
   template:
     metadata:
       annotations:
-        apm.datadoghq.com/env: '{ "DD_SERVICE": "account-service" }'
-        checksum/config: 2d2302d24a8c6784508162718cc35d7d01b2d675da78b51a095ab3329cc043dc
+        apm.datadoghq.com/env: '{ "DD_SERVICE": "release-name-account-service" }'
+        checksum/config: 8a5ec8596ac0232284140c572da272b254777326ae3bac3195a9c62d229f5a6b
         vault.hashicorp.com/agent-cache-enable: "true"
         vault.hashicorp.com/agent-init-first: "true"
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/agent-inject-secret-account_service_appian_creds.json: kv2/data/core-experience/app/account-service/appian/client-credentials
-        vault.hashicorp.com/agent-inject-secret-account_service_db_creds.json: database/creds/dev-backend-accountservice-rds-mysql-dba
-        vault.hashicorp.com/agent-inject-secret-redis_creds.json: kv/data/security/tf/dev/account-service/ec/auth
+        vault.hashicorp.com/agent-inject-secret-account_service_db_creds.json: database/creds/stg-cb-accountservice-rds-mysql-dba
+        vault.hashicorp.com/agent-inject-secret-redis_creds.json: kv/data/security/tf/stg/account-service/ec/auth
         vault.hashicorp.com/agent-inject-template-account_service_appian_creds.json: |
           {{ with secret "kv2/data/core-experience/app/account-service/appian/client-credentials" -}}
             {
@@ -534,29 +547,25 @@ spec:
             }
           {{- end }}
         vault.hashicorp.com/agent-inject-template-account_service_db_creds.json: |
-          {{ with secret "database/creds/dev-backend-accountservice-rds-mysql-dba" -}}
+          {{ with secret "database/creds/stg-cb-accountservice-rds-mysql-dba" -}}
             {
               "as_username": "{{ .Data.username }}",
               "as_password": "{{ .Data.password }}"
             }
           {{- end }}
         vault.hashicorp.com/agent-inject-template-redis_creds.json: |
-          {{ with secret "kv/data/security/tf/dev/account-service/ec/auth" -}}
+          {{ with secret "kv/data/security/tf/stg/account-service/ec/auth" -}}
             {
               "REDIS_PASSWORD": "{{ .Data.auth_token }}"
             }
           {{- end }}
-        vault.hashicorp.com/client-max-retries: "15"
-        vault.hashicorp.com/log-format: json
-        vault.hashicorp.com/log-level: trace
         vault.hashicorp.com/role: account-service
-        vault.hashicorp.com/template-static-secret-render-interval: 14400m
       labels:
-        app.kubernetes.io/instance: account-service
+        app.kubernetes.io/instance: release-name
         app.kubernetes.io/name: account-service
-        tags.datadoghq.com/env: dev
+        tags.datadoghq.com/env: stg
         tags.datadoghq.com/service: account-service
-        tags.datadoghq.com/version: dev-103e3ae-10399008
+        tags.datadoghq.com/version: rc-ce0dad6-10561784
     spec:
       containers:
       - env:
@@ -568,19 +577,29 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.uid
+        - name: DD_ENV
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['tags.datadoghq.com/env']
+        - name: DD_SERVICE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['tags.datadoghq.com/service']
+        - name: DD_VERSION
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['tags.datadoghq.com/version']
         - name: DB_NAME
-          value: account_service_dev
-        - name: MOCK_DISABLE_PENDING_ACTIVATION
-          value: "true"
+          value: account_service_stg
         - name: MYSQL_HOST
-          value: dev-backend-accountservice-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+          value: stg-cb-accountservice-rds-mysql.cvzqcc7o7v2n.ap-southeast-1.rds.amazonaws.com
         - name: MYSQL_HOST_REPLICA
-          value: dev-backend-accountservice-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+          value: stg-cb-accountservice-rds-mysql-replica.cvzqcc7o7v2n.ap-southeast-1.rds.amazonaws.com
         - name: SECRET_CONF
           value: /vault/secrets/
         - name: SERVICE_CONF
           value: /config_files/config.json
-        image: 712221657655.dkr.ecr.ap-southeast-1.amazonaws.com/account-service:dev-103e3ae-10399008
+        image: 712221657655.dkr.ecr.ap-southeast-1.amazonaws.com/account-service:rc-ce0dad6-10561784
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -597,10 +616,10 @@ spec:
             port: 8080
         resources:
           limits:
-            memory: 200Mi
+            memory: 128Mi
           requests:
-            cpu: 25m
-            memory: 200Mi
+            cpu: 100m
+            memory: 128Mi
         securityContext: {}
         volumeMounts:
         - mountPath: /config_files
@@ -612,7 +631,7 @@ spec:
         runAsGroup: 65532
         runAsNonRoot: true
         runAsUser: 65532
-      serviceAccountName: account-service
+      serviceAccountName: release-name-account-service
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -622,157 +641,10 @@ spec:
         whenUnsatisfiable: ScheduleAnyway
       volumes:
       - configMap:
-          name: account-service-account-service
+          name: account-service-release-name
         name: config-volume
 ---
-# Source: account-service/templates/go-app.yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  labels:
-    app.kubernetes.io/instance: account-service
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: account-service
-    app.kubernetes.io/version: f30ee9e
-    helm.sh/chart: account-service-0.1.0
-    tags.datadoghq.com/env: dev
-    tags.datadoghq.com/service: account-service
-    tags.datadoghq.com/version: dev-103e3ae-10399008
-  name: account-service
-spec:
-  maxReplicas: 4
-  metrics:
-  - resource:
-      name: memory
-      target:
-        averageUtilization: 75
-        type: Utilization
-    type: Resource
-  - resource:
-      name: cpu
-      target:
-        averageUtilization: 75
-        type: Utilization
-    type: Resource
-  minReplicas: 2
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: account-service
----
-# Source: account-service/templates/go-jobs.yaml
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: bank-restricted-publisher
-spec:
-  concurrencyPolicy: Replace
-  jobTemplate:
-    spec:
-      template:
-        metadata:
-          annotations:
-            checksum/config: 2d2302d24a8c6784508162718cc35d7d01b2d675da78b51a095ab3329cc043dc
-            vault.hashicorp.com/agent-cache-enable: "true"
-            vault.hashicorp.com/agent-enable-quit: "true"
-            vault.hashicorp.com/agent-init-first: "true"
-            vault.hashicorp.com/agent-inject: "true"
-            vault.hashicorp.com/agent-inject-secret-account_service_appian_creds.json: kv2/data/core-experience/app/account-service/appian/client-credentials
-            vault.hashicorp.com/agent-inject-secret-account_service_db_creds.json: database/creds/dev-backend-accountservice-rds-mysql-dba
-            vault.hashicorp.com/agent-inject-secret-redis_creds.json: kv/data/security/tf/dev/account-service/ec/auth
-            vault.hashicorp.com/agent-inject-template-account_service_appian_creds.json: |
-              {{ with secret "kv2/data/core-experience/app/account-service/appian/client-credentials" -}}
-                {
-                  "APPIAN_CLIENT_ID": "{{ .Data.data.client_id }}",
-                  "APPIAN_CLIENT_SECRET": "{{ .Data.data.client_secret }}"
-                }
-              {{- end }}
-            vault.hashicorp.com/agent-inject-template-account_service_db_creds.json: |
-              {{ with secret "database/creds/dev-backend-accountservice-rds-mysql-dba" -}}
-                {
-                  "as_username": "{{ .Data.username }}",
-                  "as_password": "{{ .Data.password }}"
-                }
-              {{- end }}
-            vault.hashicorp.com/agent-inject-template-redis_creds.json: |
-              {{ with secret "kv/data/security/tf/dev/account-service/ec/auth" -}}
-                {
-                  "REDIS_PASSWORD": "{{ .Data.auth_token }}"
-                }
-              {{- end }}
-            vault.hashicorp.com/client-max-retries: "15"
-            vault.hashicorp.com/log-format: json
-            vault.hashicorp.com/log-level: trace
-            vault.hashicorp.com/role: account-service
-            vault.hashicorp.com/template-static-secret-render-interval: 14400m
-          labels:
-            app.kubernetes.io/instance: account-service
-            app.kubernetes.io/managed-by: Helm
-            app.kubernetes.io/name: account-service-cronjob
-            app.kubernetes.io/version: f30ee9e
-            helm.sh/chart: account-service-0.1.0
-            tags.datadoghq.com/env: dev
-            tags.datadoghq.com/service: account-service
-            tags.datadoghq.com/version: dev-103e3ae-10399008
-        spec:
-          containers:
-          - env:
-            - name: DOGSTATSD_HOST
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
-            - name: DD_ENTITY_ID
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.uid
-            - name: DB_NAME
-              value: account_service_dev
-            - name: MOCK_DISABLE_PENDING_ACTIVATION
-              value: "true"
-            - name: MYSQL_HOST
-              value: dev-backend-accountservice-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
-            - name: MYSQL_HOST_REPLICA
-              value: dev-backend-accountservice-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
-            - name: SECRET_CONF
-              value: /vault/secrets/
-            - name: SERVICE_CONF
-              value: /config_files/config.json
-            - name: PUBLISHER_ENABLED
-              value: "true"
-            - name: MANUAL_QUIT_ISTIO
-              value: "true"
-            - name: MANUAL_QUIT_VAULT
-              value: "true"
-            image: 712221657655.dkr.ecr.ap-southeast-1.amazonaws.com/account-service:dev-103e3ae-10399008
-            imagePullPolicy: Always
-            name: account-service
-            resources:
-              limits:
-                cpu: 2000m
-                memory: 1Gi
-              requests:
-                cpu: 50m
-                memory: 64Mi
-            securityContext: {}
-            volumeMounts:
-            - mountPath: /config_files
-              name: config-volume
-          restartPolicy: OnFailure
-          securityContext:
-            fsGroup: 65532
-            runAsGroup: 65532
-            runAsNonRoot: true
-            runAsUser: 65532
-          serviceAccountName: account-service
-          volumes:
-          - configMap:
-              name: account-service-account-service
-            name: config-volume
-      ttlSecondsAfterFinished: 1800
-  schedule: 0 22 * * *
-  suspend: false
----
-# Source: account-service/templates/go-jobs.yaml
+# Source: account-service/templates/go-job-consumer.yaml
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -785,14 +657,14 @@ spec:
       template:
         metadata:
           annotations:
-            checksum/config: 2d2302d24a8c6784508162718cc35d7d01b2d675da78b51a095ab3329cc043dc
+            checksum/config: 8a5ec8596ac0232284140c572da272b254777326ae3bac3195a9c62d229f5a6b
             vault.hashicorp.com/agent-cache-enable: "true"
             vault.hashicorp.com/agent-enable-quit: "true"
             vault.hashicorp.com/agent-init-first: "true"
             vault.hashicorp.com/agent-inject: "true"
             vault.hashicorp.com/agent-inject-secret-account_service_appian_creds.json: kv2/data/core-experience/app/account-service/appian/client-credentials
-            vault.hashicorp.com/agent-inject-secret-account_service_db_creds.json: database/creds/dev-backend-accountservice-rds-mysql-dba
-            vault.hashicorp.com/agent-inject-secret-redis_creds.json: kv/data/security/tf/dev/account-service/ec/auth
+            vault.hashicorp.com/agent-inject-secret-account_service_db_creds.json: database/creds/stg-cb-accountservice-rds-mysql-dba
+            vault.hashicorp.com/agent-inject-secret-redis_creds.json: kv/data/security/tf/stg/account-service/ec/auth
             vault.hashicorp.com/agent-inject-template-account_service_appian_creds.json: |
               {{ with secret "kv2/data/core-experience/app/account-service/appian/client-credentials" -}}
                 {
@@ -801,32 +673,28 @@ spec:
                 }
               {{- end }}
             vault.hashicorp.com/agent-inject-template-account_service_db_creds.json: |
-              {{ with secret "database/creds/dev-backend-accountservice-rds-mysql-dba" -}}
+              {{ with secret "database/creds/stg-cb-accountservice-rds-mysql-dba" -}}
                 {
                   "as_username": "{{ .Data.username }}",
                   "as_password": "{{ .Data.password }}"
                 }
               {{- end }}
             vault.hashicorp.com/agent-inject-template-redis_creds.json: |
-              {{ with secret "kv/data/security/tf/dev/account-service/ec/auth" -}}
+              {{ with secret "kv/data/security/tf/stg/account-service/ec/auth" -}}
                 {
                   "REDIS_PASSWORD": "{{ .Data.auth_token }}"
                 }
               {{- end }}
-            vault.hashicorp.com/client-max-retries: "15"
-            vault.hashicorp.com/log-format: json
-            vault.hashicorp.com/log-level: trace
             vault.hashicorp.com/role: account-service
-            vault.hashicorp.com/template-static-secret-render-interval: 14400m
           labels:
-            app.kubernetes.io/instance: account-service
+            app.kubernetes.io/instance: release-name
             app.kubernetes.io/managed-by: Helm
             app.kubernetes.io/name: account-service-cronjob
             app.kubernetes.io/version: f30ee9e
             helm.sh/chart: account-service-0.1.0
-            tags.datadoghq.com/env: dev
+            tags.datadoghq.com/env: stg
             tags.datadoghq.com/service: account-service
-            tags.datadoghq.com/version: dev-103e3ae-10399008
+            tags.datadoghq.com/version: rc-ce0dad6-10561784
         spec:
           containers:
           - env:
@@ -839,13 +707,11 @@ spec:
                 fieldRef:
                   fieldPath: metadata.uid
             - name: DB_NAME
-              value: account_service_dev
-            - name: MOCK_DISABLE_PENDING_ACTIVATION
-              value: "true"
+              value: account_service_stg
             - name: MYSQL_HOST
-              value: dev-backend-accountservice-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+              value: stg-cb-accountservice-rds-mysql.cvzqcc7o7v2n.ap-southeast-1.rds.amazonaws.com
             - name: MYSQL_HOST_REPLICA
-              value: dev-backend-accountservice-rds-mysql.cdnmfgps5qby.ap-southeast-1.rds.amazonaws.com
+              value: stg-cb-accountservice-rds-mysql-replica.cvzqcc7o7v2n.ap-southeast-1.rds.amazonaws.com
             - name: SECRET_CONF
               value: /vault/secrets/
             - name: SERVICE_CONF
@@ -856,7 +722,7 @@ spec:
               value: "true"
             - name: MANUAL_QUIT_VAULT
               value: "true"
-            image: 712221657655.dkr.ecr.ap-southeast-1.amazonaws.com/account-service:dev-103e3ae-10399008
+            image: 712221657655.dkr.ecr.ap-southeast-1.amazonaws.com/account-service:rc-ce0dad6-10561784
             imagePullPolicy: Always
             name: account-service
             resources:
@@ -876,10 +742,124 @@ spec:
             runAsGroup: 65532
             runAsNonRoot: true
             runAsUser: 65532
-          serviceAccountName: account-service
+          serviceAccountName: release-name-account-service
           volumes:
           - configMap:
-              name: account-service-account-service
+              name: account-service-release-name
+            name: config-volume
+      ttlSecondsAfterFinished: 1800
+  schedule: 0 22 * * *
+  suspend: false
+---
+# Source: account-service/templates/go-job-publisher.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bank-restricted-publisher
+spec:
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          annotations:
+            checksum/config: 8a5ec8596ac0232284140c572da272b254777326ae3bac3195a9c62d229f5a6b
+            vault.hashicorp.com/agent-cache-enable: "true"
+            vault.hashicorp.com/agent-enable-quit: "true"
+            vault.hashicorp.com/agent-init-first: "true"
+            vault.hashicorp.com/agent-inject: "true"
+            vault.hashicorp.com/agent-inject-secret-account_service_appian_creds.json: kv2/data/core-experience/app/account-service/appian/client-credentials
+            vault.hashicorp.com/agent-inject-secret-account_service_db_creds.json: database/creds/stg-cb-accountservice-rds-mysql-dba
+            vault.hashicorp.com/agent-inject-secret-redis_creds.json: kv/data/security/tf/stg/account-service/ec/auth
+            vault.hashicorp.com/agent-inject-secret-snowflake_db_creds.json: database/static-creds/stg-data-backend-bank-restricted-service-ro
+            vault.hashicorp.com/agent-inject-template-account_service_appian_creds.json: |
+              {{ with secret "kv2/data/core-experience/app/account-service/appian/client-credentials" -}}
+                {
+                  "APPIAN_CLIENT_ID": "{{ .Data.data.client_id }}",
+                  "APPIAN_CLIENT_SECRET": "{{ .Data.data.client_secret }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/agent-inject-template-account_service_db_creds.json: |
+              {{ with secret "database/creds/stg-cb-accountservice-rds-mysql-dba" -}}
+                {
+                  "as_username": "{{ .Data.username }}",
+                  "as_password": "{{ .Data.password }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/agent-inject-template-redis_creds.json: |
+              {{ with secret "kv/data/security/tf/stg/account-service/ec/auth" -}}
+                {
+                  "REDIS_PASSWORD": "{{ .Data.auth_token }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/agent-inject-template-snowflake_db_creds.json: |
+              {{ with secret "database/static-creds/stg-data-backend-bank-restricted-service-ro" -}}
+                {
+                  "SNOWFLAKE_USER": "{{ .Data.username }}",
+                  "SNOWFLAKE_PASSWORD": "{{ .Data.password }}"
+                }
+              {{- end }}
+            vault.hashicorp.com/role: account-service
+          labels:
+            app.kubernetes.io/instance: release-name
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: account-service-cronjob
+            app.kubernetes.io/version: f30ee9e
+            helm.sh/chart: account-service-0.1.0
+            tags.datadoghq.com/env: stg
+            tags.datadoghq.com/service: account-service
+            tags.datadoghq.com/version: rc-ce0dad6-10561784
+        spec:
+          containers:
+          - env:
+            - name: DOGSTATSD_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_ENTITY_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: DB_NAME
+              value: account_service_stg
+            - name: MYSQL_HOST
+              value: stg-cb-accountservice-rds-mysql.cvzqcc7o7v2n.ap-southeast-1.rds.amazonaws.com
+            - name: MYSQL_HOST_REPLICA
+              value: stg-cb-accountservice-rds-mysql-replica.cvzqcc7o7v2n.ap-southeast-1.rds.amazonaws.com
+            - name: SECRET_CONF
+              value: /vault/secrets/
+            - name: SERVICE_CONF
+              value: /config_files/config.json
+            - name: PUBLISHER_ENABLED
+              value: "true"
+            - name: MANUAL_QUIT_ISTIO
+              value: "true"
+            - name: MANUAL_QUIT_VAULT
+              value: "true"
+            image: 712221657655.dkr.ecr.ap-southeast-1.amazonaws.com/account-service:rc-ce0dad6-10561784
+            imagePullPolicy: Always
+            name: account-service
+            resources:
+              limits:
+                cpu: 2000m
+                memory: 1Gi
+              requests:
+                cpu: 50m
+                memory: 64Mi
+            securityContext: {}
+            volumeMounts:
+            - mountPath: /config_files
+              name: config-volume
+          restartPolicy: OnFailure
+          securityContext:
+            fsGroup: 65532
+            runAsGroup: 65532
+            runAsNonRoot: true
+            runAsUser: 65532
+          serviceAccountName: release-name-account-service
+          volumes:
+          - configMap:
+              name: account-service-release-name
             name: config-volume
       ttlSecondsAfterFinished: 1800
   schedule: 0 22 * * *
@@ -889,11 +869,11 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "account-service-test-connection"
+  name: "release-name-account-service-test-connection"
   labels:
     helm.sh/chart: account-service-0.1.0
     app.kubernetes.io/name: account-service
-    app.kubernetes.io/instance: account-service
+    app.kubernetes.io/instance: release-name
     app.kubernetes.io/version: "f30ee9e"
     app.kubernetes.io/managed-by: Helm
   annotations:
@@ -903,5 +883,5 @@ spec:
     - name: wget
       image: 303083450960.dkr.ecr.ap-southeast-3.amazonaws.com/public-images:busybox-1.33.1
       command: ['wget']
-      args: ['account-service:80']
+      args: ['release-name-account-service:80']
   restartPolicy: Never
